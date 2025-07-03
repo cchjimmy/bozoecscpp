@@ -6,12 +6,12 @@
 #include <vector>
 
 std::vector<World *> World::mWorlds;
-std::unordered_map<int, std::vector<int>> World::mIndexMap;
-std::vector<int> World::mEntityMasks;
+std::unordered_map<std::type_index, std::unordered_map<entityT, int>>
+    World::mIndexMap;
+std::unordered_map<entityT, int> World::mEntityMasks;
 std::unordered_map<int, std::set<entityT>> World::mArchetypeMap = {
     {0, std::set<int>()}};
 std::unordered_map<int, void (*)(entityT)> World::mRemoveMap;
-std::unordered_map<int, std::vector<entityT>> World::mOwnerMap;
 
 World::~World() {
   mWorlds.clear();
@@ -27,11 +27,8 @@ World::World() {
 
 entityT World::createEntity() {
   const entityT e = EntityManager::create();
-  if (e >= mEntityMasks.size()) {
-    mEntityMasks.resize(e + 1);
-  }
   mEntityMasks[e] = 0;
-  mArchetypeMap.at(0).insert(e);
+  mArchetypeMap[0].insert(e);
   return e;
 }
 
@@ -39,8 +36,9 @@ entityT World::deleteEntity(entityT entity) {
   for (auto &world : mWorlds) {
     world->removeEntity(entity);
   }
-  for (int i = 0, l = ComponentManager::typesLen(), m = mEntityMasks[entity];
-       i < l; i++) {
+
+  const auto &types = ComponentManager::types();
+  for (int i = 0, l = types.size(), m = mEntityMasks[entity]; i < l; i++) {
     if (!(m & 1 << i))
       continue;
     mRemoveMap[i](entity);

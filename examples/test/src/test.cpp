@@ -1,14 +1,13 @@
-#include "../src/world.hpp"
+#include "world.hpp"
 #include <iostream>
 
-class Position {
-public:
-  float x = 0, y = 0;
-};
-class Velocity {
-public:
-  float x = 0, y = 0;
-};
+typedef struct {
+  float x, y;
+} Position;
+
+typedef struct {
+  float x, y;
+} Velocity;
 
 void addEntityP(World &w) {
   const entityT e = w.addEntity();
@@ -25,8 +24,7 @@ void addEntityPV(World &w) {
 }
 
 void Move(World &w) {
-  const auto &entities = w.query<And<Position, Velocity>>();
-  for (auto &e : entities) {
+  for (auto &e : w.query<And<Position, Velocity>>()) {
     Position &p = w.getComponent<Position>(e);
     Velocity &v = w.getComponent<Velocity>(e);
     p.x += v.x * w.dtMicro / 1e6;
@@ -48,8 +46,6 @@ int main() {
   for (int i = 0, l = 1; i < l; i++) {
     addEntityPV(w);
   }
-
-  while (true) {
+  while (true)
     w.update(Move);
-  }
 }
