@@ -2,34 +2,28 @@
 #include "component.hpp"
 #include "entity.hpp"
 #include "query.hpp"
-#include <algorithm>
-#include <chrono>
-#include <ctime>
+#include <iterator>
+#include <optional>
 #include <set>
-#include <stdexcept>
-#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
 class World {
 public:
   template <typename T> static inline void registerComponent() {
+    if (ComponentManager::isRegistered<T>())
+      return;
     ComponentManager::reg<T>();
-    mRemoveMap[ComponentManager::getId<T>()] = [](entityT e) {
-      ComponentManager::remove<T>(e);
-    };
+    mRemoveMap[typeid(T)] = [](entityT e) { ComponentManager::remove<T>(e); };
   }
 
   template <typename T> static inline T &addComponent(entityT entity) {
-    if (!ComponentManager::isRegistered<T>())
-      registerComponent<T>();
+    registerComponent<T>();
     if (hasComponent<T>(entity))
       throw std::invalid_argument("Entity " + std::to_string(entity) +
                                   " already has component " + typeid(T).name());
 
-    mIndexMap[typeid(T)][entity] = ComponentManager::size<T>();
-
-    T &comp = ComponentManager::create<T>();
+    T &comp = ComponentManager::add<T>(entity);
 
     mArchetypeMap[mEntityMasks[entity]].erase(entity);
     mEntityMasks[entity] |= 1 << ComponentManager::getId<T>();
@@ -37,28 +31,14 @@ public:
     return comp;
   }
 
-  template <typename T> static inline T &removeComponent(entityT entity) {
+  template <typename T> static inline bool removeComponent(entityT entity) {
     if (!hasComponent<T>(entity))
-      throw std::invalid_argument("Entity " + std::to_string(entity) +
-                                  " does not have component " +
-                                  typeid(T).name());
-
-    T &removed = ComponentManager::remove<T>(mIndexMap[typeid(T)][entity]);
-    entityT backEntity;
-
-    for (auto &kv : mIndexMap[typeid(T)]) {
-      if (kv.second != mIndexMap[typeid(T)][entity])
-        continue;
-      backEntity = kv.first;
-      break;
-    }
-
-    mIndexMap[typeid(T)][backEntity] = mIndexMap[typeid(T)][entity];
-
+      return false;
+    ComponentManager::remove<T>(entity);
     mArchetypeMap[mEntityMasks[entity]].erase(entity);
     mEntityMasks[entity] &= ~(1 << ComponentManager::getId<T>());
     mArchetypeMap[mEntityMasks[entity]].insert(entity);
-    return removed;
+    return true;
   }
 
   template <typename T> static inline bool hasComponent(entityT entity) {
@@ -70,16 +50,14 @@ public:
       throw std::invalid_argument("Entity " + std::to_string(entity) +
                                   " does not have component " +
                                   typeid(T).name());
-
-    return ComponentManager::get<T>(mIndexMap[typeid(T)][entity]);
+    return ComponentManager::get<T>(entity);
   }
 
   static entityT createEntity();
-  static entityT deleteEntity(entityT entity);
+  static void deleteEntity(entityT entity);
 
-  entityT addEntity(std::optional<entityT> entity = std::nullopt);
-  entityT removeEntity(entityT entity);
-  bool entityExists(entityT entity);
+  entityT addEntity(entityT entity = World::createEntity());
+  void removeEntity(entityT entity);
 
   template <typename... SubQueries> inline std::vector<entityT> query() {
     Query<SubQueries...> q;
@@ -87,26 +65,37 @@ public:
     for (auto &archetype : mArchetypeMap) {
       if (archetype.second.size() > 0 &&
           (archetype.first & q.andMask) == q.andMask &&
-          (archetype.first | q.orMask) > 0 &&
           (archetype.first & q.notMask) == 0) {
-        std::set_intersection(archetype.second.begin(), archetype.second.end(),
-                              mLocalEntities.begin(), mLocalEntities.end(),
-                              std::back_inserter(res));
+        res.insert(res.end(), archetype.second.begin(), archetype.second.end());
       }
     }
+    std::set_intersection(res.begin(), res.end(), mLocalEntities.begin(),
+                          mLocalEntities.end(), std::back_inserter(res));
     return res;
   };
 
   template <typename... Fns>
     requires(std::is_convertible_v<Fns, void (*)(World &)>, ...)
   inline void update(Fns... fns) {
-    auto start = std::chrono::system_clock::now();
     (fns(*this), ...);
-    dtMicro = static_cast<time_t>(
-        std::chrono::duration_cast<std::chrono::microseconds>(
-            std::chrono::system_clock::now() - start)
-            .count());
-    timeMicro += dtMicro;
+    while (mEntitiesToDelete.size()) {
+      entityT entity = mEntitiesToDelete.back();
+      mEntitiesToDelete.pop_back();
+      for (auto &world : mWorlds) {
+        world->removeEntity(entity);
+      }
+
+      const auto &types = ComponentManager::types();
+      for (int i = 0, l = types.size(), m = mEntityMasks[entity]; i < l; i++) {
+        if (!(m & 1 << i))
+          continue;
+        mRemoveMap[types[i]](entity);
+      }
+
+      int mask = mEntityMasks.at(entity);
+      mArchetypeMap[mask].erase(entity);
+      mEntityMasks.erase(entity);
+    }
   }
 
   size_t entityCount();
@@ -114,15 +103,12 @@ public:
   World();
   ~World();
 
-  time_t timeMicro, dtMicro;
-
 private:
   static std::vector<World *> mWorlds;
-  static std::unordered_map<std::type_index, std::unordered_map<entityT, int>>
-      mIndexMap;
   static std::unordered_map<entityT, int> mEntityMasks;
   static std::unordered_map<int, std::set<entityT>> mArchetypeMap;
-  static std::unordered_map<int, void (*)(entityT)> mRemoveMap;
+  static std::unordered_map<std::type_index, void (*)(entityT)> mRemoveMap;
+  static std::vector<entityT> mEntitiesToDelete;
 
   std::set<entityT> mLocalEntities;
 };

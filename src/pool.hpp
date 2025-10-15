@@ -1,49 +1,56 @@
 #pragma once
-#include <algorithm>
-#include <stdexcept>
+#include <unordered_map>
 #include <vector>
 
-template <typename T> class ObjectPool {
+template <typename K, typename V> class ObjectPoolMap {
 public:
-  ObjectPool() = default;
-  ~ObjectPool() { mStorage.clear(); }
+  ObjectPoolMap() = default;
+  ~ObjectPoolMap();
 
-  T &addObj() {
+  V &add(K key) {
+    if (mIndices.contains(key))
+      return mStorage.at(mIndices.at(key));
     if (mSize >= mStorage.size())
       mStorage.emplace_back();
+    mIndices[key] = mSize;
     mSize++;
     return mStorage.at(mSize - 1);
   }
 
-  T &removeObj(int index) {
-    if (index > mSize) {
-      throw std::out_of_range("Index out of range.");
+  bool remove(K key) {
+    if (!mIndices.contains(key))
+      return false;
+    int index = mIndices[key];
+    mIndices.erase(key);
+    V &removed = mStorage[index];
+    mStorage[index] = mStorage[mSize - 1];
+    mStorage[mSize - 1] = removed;
+    for (auto &entry : mIndices) {
+      if (entry.second != mSize - 1)
+        continue;
+      mIndices[entry.first] = index;
+      break;
     }
-    T &removed = mStorage.at(index);
-    mStorage[index] = mStorage.back();
-    mStorage[mStorage.size() - 1] = removed;
     mSize--;
-    return removed;
+    return true;
   }
 
-  int find(T &obj) {
-    return std::find(mStorage.begin(), mStorage.end(), obj) - mStorage.begin();
-  }
-
-  T &at(int index) {
-    if (index > mSize) {
+  V &get(K key) {
+    if (!mIndices.contains(key))
+      throw std::logic_error("Key not found.");
+    int index = mIndices.at(key);
+    if (index >= mSize) {
       throw std::out_of_range("Index out of range.");
     }
     return mStorage.at(index);
   }
-
-  T &operator[](int index) { return at(index); }
 
   void clear() { mStorage.clear(); }
 
   size_t size() { return mSize; }
 
 private:
-  std::vector<T> mStorage;
+  std::unordered_map<K, int> mIndices;
+  std::vector<V> mStorage;
   size_t mSize = 0;
 };

@@ -1,4 +1,5 @@
 #pragma once
+#include "entity.hpp"
 #include "pool.hpp"
 #include <typeindex>
 #include <unordered_map>
@@ -9,31 +10,30 @@ public:
   ComponentManager() = default;
   ~ComponentManager() {
     for (auto &pool : mPoolMap) {
-      static_cast<ObjectPool<void *> *>(pool.second)->clear();
-      delete static_cast<ObjectPool<void *> *>(pool.second);
+      static_cast<ObjectPoolMap<entityT, void *> *>(pool.second)->clear();
+      delete static_cast<ObjectPoolMap<entityT, void *> *>(pool.second);
     }
     mPoolMap.clear();
   }
 
   template <typename T> inline static void reg() {
     mIdMap[typeid(T)] = mIdMap.size();
-    mPoolMap[typeid(T)] = static_cast<void *>(new ObjectPool<T>);
+    mPoolMap[typeid(T)] = static_cast<void *>(new ObjectPoolMap<entityT, T>);
   }
 
-  template <typename T> inline static T &create() {
-    throwNotRegistered<T>();
-    return (static_cast<ObjectPool<T> *>(mPoolMap.at(typeid(T)))->addObj());
+  template <typename T> inline static T &add(entityT entity) {
+    return (static_cast<ObjectPoolMap<entityT, T> *>(mPoolMap.at(typeid(T)))
+                ->add(entity));
   }
 
-  template <typename T> inline static T &remove(int index) {
-    throwNotRegistered<T>();
-    return (
-        static_cast<ObjectPool<T> *>(mPoolMap.at(typeid(T)))->removeObj(index));
+  template <typename T> inline static bool remove(entityT entity) {
+    return (static_cast<ObjectPoolMap<entityT, T> *>(mPoolMap.at(typeid(T)))
+                ->remove(entity));
   }
 
-  template <typename T> inline static T &get(int index) {
-    throwNotRegistered<T>();
-    return static_cast<ObjectPool<T> *>(mPoolMap.at(typeid(T)))->at(index);
+  template <typename T> inline static T &get(entityT entity) {
+    return static_cast<ObjectPoolMap<entityT, T> *>(mPoolMap.at(typeid(T)))
+        ->get(entity);
   }
 
   template <typename T> inline static void dereg() {
@@ -44,18 +44,9 @@ public:
     return mIdMap.find(typeid(T)) != mIdMap.end();
   }
 
-  template <typename T> inline static void throwNotRegistered() {
-    if (!isRegistered<T>())
-      throw std::invalid_argument(std::string("Component ") + typeid(T).name() +
-                                  " is not registered.");
-  }
-
-  template <typename T> inline static ObjectPool<T> &at() {
-    return *static_cast<ObjectPool<T> *>(mPoolMap.at(typeid(T)));
-  }
-
   template <typename T> inline static size_t size() {
-    return static_cast<ObjectPool<T> *>(mPoolMap.at(typeid(T)))->size();
+    return static_cast<ObjectPoolMap<entityT, T> *>(mPoolMap.at(typeid(T)))
+        ->size();
   }
 
   static std::vector<std::type_index> types() {
