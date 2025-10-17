@@ -3,6 +3,17 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_BUILD_TYPE Debug)
 
+include(FetchContent)
+
+FetchContent_Declare(
+	raylib
+	GIT_REPOSITORY https://github.com/raysan5/raylib.git
+)
+
+FetchContent_MakeAvailable(
+	raylib
+)
+
 project(ecs)
 add_library(${PROJECT_NAME} SHARED)
 file(GLOB SRC ./src/*)

@@ -3,15 +3,15 @@
 #include "pool.hpp"
 #include <typeindex>
 #include <unordered_map>
-#include <vector>
 
 class ComponentManager {
 public:
   ComponentManager() = default;
   ~ComponentManager() {
     for (auto &pool : mPoolMap) {
-      static_cast<ObjectPoolMap<entityT, void *> *>(pool.second)->clear();
-      delete static_cast<ObjectPoolMap<entityT, void *> *>(pool.second);
+      auto p = static_cast<ObjectPoolMap<entityT, void *> *>(pool.second);
+      p->clear();
+      delete p;
     }
     mPoolMap.clear();
   }
@@ -49,16 +49,26 @@ public:
         ->size();
   }
 
-  static std::vector<std::type_index> types() {
-    std::vector<std::type_index> res;
-    for (auto &kv : mIdMap) {
-      res.push_back(kv.first);
-    }
-    return res;
-  }
-
   template <typename T> inline static int getId() {
     return mIdMap.contains(typeid(T)) ? mIdMap[typeid(T)] : -1;
+  }
+
+  static entityT copy(entityT entity) {
+    entityT copied = newEntity();
+    for (auto &pool : mPoolMap) {
+      auto p = static_cast<ObjectPoolMap<entityT, void *> *>(pool.second);
+      if (!p->has(entity))
+        continue;
+      p->add(copied) = p->get(entity);
+    }
+    return copied;
+  }
+
+  static void remove(entityT entity) {
+    for (auto &pool : mPoolMap) {
+      static_cast<ObjectPoolMap<entityT, void *> *>(pool.second)
+          ->remove(entity);
+    }
   }
 
 private:
