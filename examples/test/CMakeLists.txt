@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
 
-add_executable(test)
+project(test)
+add_executable(${PROJECT_NAME})
 file(GLOB SRCS ./src/*)
-
-target_sources(test PUBLIC ${SRCS})
-target_link_libraries(test ecs)
-target_include_directories(test PUBLIC ../../src)
+target_sources(${PROJECT_NAME} PUBLIC ${SRCS})
+target_link_libraries(${PROJECT_NAME} raylib)
+target_include_directories(${PROJECT_NAME} PUBLIC ../../src)

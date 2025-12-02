@@ -1,8 +1,5 @@
 #include "raylib.h"
 #include "world.hpp"
-#include <cmath>
-#include <cstdlib>
-#include <string>
 
 #define PARTICLE_COUNT 1000
 
@@ -18,10 +15,10 @@ typedef struct {
 
 auto addParticle(World &world, int x = 0, int y = 0, int w = 10, int h = 10) {
   const auto e = world.addEntity();
-  World::addComponent<Velocity>(e);
-  World::addComponent<Color>(e);
-  auto &p = World::addComponent<Position>(e);
-  auto &r = World::addComponent<Rect>(e);
+  world.addComponent<Velocity>(e);
+  world.addComponent<Color>(e);
+  auto &p = world.addComponent<Position>(e);
+  auto &r = world.addComponent<Rect>(e);
   p.x = x, p.y = y, r.width = w, r.height = h;
   return e;
 }
@@ -29,23 +26,21 @@ auto addParticle(World &world, int x = 0, int y = 0, int w = 10, int h = 10) {
 void handleDrawing(World &world) {
   BeginDrawing();
   ClearBackground(BLACK);
+  DrawFPS(0, 0);
   for (auto e : world.query<And<Position, Rect, Color>>()) {
-    auto &p = World::getComponent<Position>(e);
-    auto &r = World::getComponent<Rect>(e);
-    auto &c = World::getComponent<Color>(e);
+    auto &p = world.getComponent<Position>(e);
+    auto &r = world.getComponent<Rect>(e);
+    auto &c = world.getComponent<Color>(e);
     DrawRectangleLines(p.x - r.width * 0.5, p.y - r.height * 0.5, r.width,
                        r.height, c);
   }
-
-  DrawText((std::string("FPS: ") + std::to_string(1 / GetFrameTime())).c_str(),
-           0, 0, 24, WHITE);
   EndDrawing();
 }
 
 void handleMovement(World &world) {
   for (auto e : world.query<And<Position, Velocity>>()) {
-    auto &p = World::getComponent<Position>(e);
-    auto &v = World::getComponent<Velocity>(e);
+    auto &p = world.getComponent<Position>(e);
+    auto &v = world.getComponent<Velocity>(e);
     p.x += v.x * GetFrameTime();
     p.y += v.y * GetFrameTime();
   }
@@ -55,9 +50,9 @@ void handleCollision(World &world) {
   auto screenWidth = GetScreenWidth();
   auto screenHeight = GetScreenHeight();
   for (auto e : world.query<And<Position, Velocity, Rect>>()) {
-    auto &p = World::getComponent<Position>(e);
-    auto &v = World::getComponent<Velocity>(e);
-    auto &r = World::getComponent<Rect>(e);
+    auto &p = world.getComponent<Position>(e);
+    auto &v = world.getComponent<Velocity>(e);
+    auto &r = world.getComponent<Rect>(e);
     if (p.x - r.width * 0.5 < 0 || p.x + r.width * 0.5 > screenWidth) {
       v.x *= -1;
       p.x = p.x < screenWidth * 0.5 ? r.width * 0.5 + 1
@@ -78,16 +73,16 @@ float random(float max = 1, float min = 0) {
 int main() {
   SetConfigFlags(FLAG_WINDOW_RESIZABLE);
   SetTargetFPS(60);
-  InitWindow(300, 150, "particles");
+  InitWindow(900, 600, "particles");
   World game;
   const auto screenWidth = GetScreenWidth();
   const auto screenHeight = GetScreenHeight();
   for (int i = 0; i < PARTICLE_COUNT; i++) {
     const auto e = addParticle(game);
-    auto &p = World::getComponent<Position>(e);
-    auto &v = World::getComponent<Velocity>(e);
-    auto &c = World::getComponent<Color>(e);
-    auto &r = World::getComponent<Rect>(e);
+    auto &p = game.getComponent<Position>(e);
+    auto &v = game.getComponent<Velocity>(e);
+    auto &c = game.getComponent<Color>(e);
+    auto &r = game.getComponent<Rect>(e);
     p.x = random(screenWidth);
     p.y = random(screenHeight);
     float dir = random(2 * PI);

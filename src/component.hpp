@@ -7,71 +7,66 @@
 class ComponentManager {
 public:
   ComponentManager() = default;
-  ~ComponentManager() {
-    for (auto &pool : mPoolMap) {
-      auto p = static_cast<ObjectPoolMap<entityT, void *> *>(pool.second);
-      p->clear();
-      delete p;
-    }
-    mPoolMap.clear();
-  }
+  ~ComponentManager() = default;
 
-  template <typename T> inline static void reg() {
+  template <typename T> inline void reg() {
     mIdMap[typeid(T)] = mIdMap.size();
-    mPoolMap[typeid(T)] = static_cast<void *>(new ObjectPoolMap<entityT, T>);
+    mPoolMap[typeid(T)] = reinterpret_cast<ObjectPoolMap<entityT, void *> *>(
+        new ObjectPoolMap<entityT, T>());
   }
 
-  template <typename T> inline static T &add(entityT entity) {
-    return (static_cast<ObjectPoolMap<entityT, T> *>(mPoolMap.at(typeid(T)))
-                ->add(entity));
+  template <typename T> inline T &add(const entityT &entity) {
+    return reinterpret_cast<ObjectPoolMap<entityT, T> *>(mPoolMap[typeid(T)])
+        ->add(entity);
   }
 
-  template <typename T> inline static bool remove(entityT entity) {
-    return (static_cast<ObjectPoolMap<entityT, T> *>(mPoolMap.at(typeid(T)))
-                ->remove(entity));
+  template <typename T> inline void remove(const entityT &entity) {
+    mPoolMap[typeid(T)]->remove(entity);
   }
 
-  template <typename T> inline static T &get(entityT entity) {
-    return static_cast<ObjectPoolMap<entityT, T> *>(mPoolMap.at(typeid(T)))
+  template <typename T> inline bool has(const entityT &entity) {
+    return mPoolMap.contains(typeid(T)) && mPoolMap[typeid(T)]->has(entity);
+  }
+
+  template <typename T> inline T &get(const entityT &entity) {
+    return reinterpret_cast<ObjectPoolMap<entityT, T> *>(mPoolMap[typeid(T)])
         ->get(entity);
   }
 
-  template <typename T> inline static void dereg() {
-    mPoolMap.erase(typeid(T));
-  }
+  template <typename T> inline void dereg() { mPoolMap.erase(typeid(T)); }
 
-  template <typename T> inline static bool isRegistered() {
+  template <typename T> inline bool isRegistered() {
     return mIdMap.find(typeid(T)) != mIdMap.end();
   }
 
-  template <typename T> inline static size_t size() {
-    return static_cast<ObjectPoolMap<entityT, T> *>(mPoolMap.at(typeid(T)))
-        ->size();
+  template <typename T> inline size_t size() {
+    return mPoolMap[typeid(T)]->size();
   }
 
-  template <typename T> inline static int getId() {
+  template <typename T> inline int getId() {
     return mIdMap.contains(typeid(T)) ? mIdMap[typeid(T)] : -1;
   }
 
-  static entityT copy(entityT entity) {
-    entityT copied = newEntity();
+  void copy(const entityT &src, const entityT &dest) {
     for (auto &pool : mPoolMap) {
-      auto p = static_cast<ObjectPoolMap<entityT, void *> *>(pool.second);
-      if (!p->has(entity))
+      if (!pool.second->has(src))
         continue;
-      p->add(copied) = p->get(entity);
+      pool.second->add(dest) = pool.second->get(src);
     }
-    return copied;
   }
 
-  static void remove(entityT entity) {
-    for (auto &pool : mPoolMap) {
-      static_cast<ObjectPoolMap<entityT, void *> *>(pool.second)
-          ->remove(entity);
-    }
+  void erase(const entityT &entity) {
+    for (auto &pool : mPoolMap)
+      pool.second->remove(entity);
+  }
+
+  void clean() {
+    for (auto &pool : mPoolMap)
+      pool.second->clean();
   }
 
 private:
-  static std::unordered_map<std::type_index, void *> mPoolMap;
-  static std::unordered_map<std::type_index, int> mIdMap;
+  std::unordered_map<std::type_index, ObjectPoolMap<entityT, void *> *>
+      mPoolMap;
+  std::unordered_map<std::type_index, int> mIdMap;
 };

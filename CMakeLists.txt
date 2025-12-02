@@ -14,11 +14,6 @@ FetchContent_MakeAvailable(
 	raylib
 )
 
-project(ecs)
-add_library(${PROJECT_NAME} SHARED)
-file(GLOB SRC ./src/*)
-target_sources(${PROJECT_NAME} PUBLIC ${SRC})
-
 file(GLOB EXAMPLES ./examples/*)
 foreach(EXAMPLE ${EXAMPLES})
 	if(IS_DIRECTORY ${EXAMPLE})

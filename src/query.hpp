@@ -1,11 +1,10 @@
 #pragma once
 #include "component.hpp"
-#include <type_traits>
 
 template <typename... Components> class ISubQuery {
 public:
-  static int getMask() {
-    static int mask = (0 | ... | (1 << ComponentManager::getId<Components>()));
+  static int getMask(ComponentManager &cm) {
+    static int mask = (0 | ... | (1 << cm.getId<Components>()));
     return mask;
   }
   virtual ~ISubQuery() = default;
@@ -34,14 +33,15 @@ template <typename... SubQueries> class Query {
 public:
   int andMask = 0, notMask = 0;
 
-  Query() { (processSubQuery<SubQueries>(), ...); }
+  Query(ComponentManager &cm) { (processSubQuery<SubQueries>(cm), ...); }
 
 private:
-  template <typename SubQuery> inline void processSubQuery() {
+  template <typename SubQuery>
+  inline void processSubQuery(ComponentManager &cm) {
     if constexpr (is_instance_of_v<SubQuery, And>) {
-      andMask |= SubQuery::getMask();
+      andMask |= SubQuery::getMask(cm);
     } else if constexpr (is_instance_of_v<SubQuery, Not>) {
-      notMask |= SubQuery::getMask();
+      notMask |= SubQuery::getMask(cm);
     }
   }
 };
