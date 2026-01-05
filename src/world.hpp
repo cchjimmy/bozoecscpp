@@ -20,26 +20,25 @@ public:
   template <typename T>
   inline T &addComponent(const entityT &entity, const T &values = {}) {
     registerComponent<T>();
-    T &comp = mComponentManager.add<T>(entity);
     int mask = mEntityMasks[entity];
-    const int compId = mComponentManager.getId<T>();
-    comp = values;
-    if (mask & (1 << compId))
-      return comp;
+    const int compMask = mComponentManager.getMask<T>();
+    if (mask & compMask)
+      return mComponentManager.get<T>(entity) = values;
     mArchetypeMap[mask].erase(entity);
-    mask = mEntityMasks[entity] |= 1 << compId;
+    mask = mEntityMasks[entity] ^= compMask;
     mArchetypeMap[mask].insert(entity);
-    return comp;
+    return mComponentManager.add<T>(entity) = values;
   }
 
   template <typename T> inline void removeComponent(const entityT &entity) {
+    registerComponent<T>();
     int mask = mEntityMasks[entity];
-    const int compId = mComponentManager.getId<T>();
-    if ((mask & (1 << compId)) == 0)
+    const int compMask = mComponentManager.getMask<T>();
+    if ((mask & compMask) ^ compMask)
       return;
     mComponentManager.remove<T>(entity);
     mArchetypeMap[mask].erase(entity);
-    mask = mEntityMasks[entity] ^= 1 << compId;
+    mask = mEntityMasks[entity] ^= compMask;
     mArchetypeMap[mask].insert(entity);
   }
 
@@ -53,8 +52,7 @@ public:
 
   void deleteEntity(const entityT &entity) {
     mComponentManager.erase(entity);
-    int mask = mEntityMasks.at(entity);
-    mArchetypeMap[mask].erase(entity);
+    mArchetypeMap[mEntityMasks.at(entity)].erase(entity);
     mEntityMasks.erase(entity);
   };
 
@@ -69,11 +67,12 @@ public:
   template <typename... SubQueries> inline std::vector<entityT> query() {
     Query<SubQueries...> q(mComponentManager);
     std::vector<entityT> res;
-    for (auto &archetype : mArchetypeMap) {
+    for (const auto &archetype : mArchetypeMap) {
       if (archetype.second.size() > 0 &&
           (archetype.first & q.andMask) == q.andMask &&
-          (archetype.first & q.notMask) == 0)
+          (archetype.first & q.notMask) == 0) {
         res.insert(res.end(), archetype.second.begin(), archetype.second.end());
+      }
     }
     return res;
   };
@@ -97,7 +96,7 @@ public:
   void cleanObjectPools() { mComponentManager.clean(); }
 
 private:
-  std::unordered_map<entityT, int> mEntityMasks;
+  std::unordered_map<entityT, uint32_t> mEntityMasks;
   std::unordered_map<int, std::set<entityT>> mArchetypeMap;
   ComponentManager mComponentManager;
 };

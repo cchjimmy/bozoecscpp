@@ -2,7 +2,15 @@
 #include <unordered_map>
 #include <vector>
 
-template <typename K, typename V> class ObjectPoolMap {
+class IObjectPoolMap {
+public:
+  virtual void clear() = 0;
+  virtual void clean() = 0;
+  virtual size_t size() = 0;
+  virtual ~IObjectPoolMap() {};
+};
+
+template <typename K, typename V> class ObjectPoolMap : public IObjectPoolMap {
 public:
   ObjectPoolMap() = default;
   ~ObjectPoolMap() = default;
@@ -20,9 +28,12 @@ public:
   void remove(const K &key) {
     if (!mKeyToIndex.contains(key))
       return;
-    mStorage[mKeyToIndex[key]] = mStorage[mKeyToIndex[mindexToKey.back()]];
-    mindexToKey[mKeyToIndex[key]] = mindexToKey.back();
+    const int index = mKeyToIndex[key];
+    const K backKey = mindexToKey.back();
+    mStorage[index] = mStorage[mKeyToIndex[backKey]];
+    mindexToKey[index] = backKey;
     mindexToKey.pop_back();
+    mKeyToIndex[backKey] = index;
     mKeyToIndex.erase(key);
   }
 
@@ -30,15 +41,15 @@ public:
 
   bool has(const K &key) { return mKeyToIndex.contains(key); }
 
-  void clear() {
+  void clear() override {
     mStorage.clear();
     mKeyToIndex.clear();
     mindexToKey.clear();
   }
 
-  void clean() { mStorage.resize(mKeyToIndex.size()); }
+  void clean() override { mStorage.resize(mKeyToIndex.size()); }
 
-  size_t size() { return mKeyToIndex.size(); }
+  size_t size() override { return mKeyToIndex.size(); }
 
 private:
   std::unordered_map<K, int> mKeyToIndex;
