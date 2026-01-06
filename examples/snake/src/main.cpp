@@ -86,6 +86,18 @@ entityT findLastChild(World &world, entityT parent) {
 }
 
 // systems
+void handleDrawSnake(World &world) {
+  for (auto e : world.query<And<Hierarchy, TransformSimple, Color>>()) {
+    auto &h = world.getComponent<Hierarchy>(e);
+    if (h.child == -1 || !world.hasComponent<TransformSimple>(h.child))
+      continue;
+    auto &t = world.getComponent<TransformSimple>(e);
+    auto &c = world.getComponent<Color>(e);
+    auto &tChild = world.getComponent<TransformSimple>(h.child);
+    DrawLineEx({.x = t.x, .y = t.y}, {.x = tChild.x, .y = tChild.y},
+               Config::snake::width, c);
+  }
+}
 void handleDrawText(World &world) {
   for (auto &e : world.query<And<Text, TransformSimple>>()) {
     const auto &text = world.getComponent<Text>(e);
@@ -315,8 +327,8 @@ int main() {
         player != -1 ? calcSnakeSize(game, player) - Config::snake::startLen
                      : 0);
 
-    game.update(handleDrawCircles, handleDrawText, handleReset, handleInput,
-                handleSpawnFood, handleEatFood, handlePartMovement,
+    game.update(handleDrawCircles, handleDrawSnake, handleDrawText, handleReset,
+                handleInput, handleSpawnFood, handleEatFood, handlePartMovement,
                 handleMovement);
 
     EndTextureMode();
