@@ -74,12 +74,19 @@ int main() {
       auto e = test.addEntity();
       auto &p = test.addComponent<Position>(e, {.x = 10, .y = 1});
     }
+
+    typedef struct {
+    } NotInUse;
+
     auto e = test.addEntity();
     test.addComponent<Position>(e);
     test.addComponent<Velocity>(e);
-    auto q = test.query<And<Position>>();
-    auto q1 = test.query<And<Position, Velocity>>();
-    assert(q.size() == 11);
-    assert(q1.size() == 1);
+
+    auto q1 = test.query<And<Position>>();
+    auto q2 = test.query<And<Position, Velocity>>();
+    auto q3 = test.query<Not<Velocity>>();
+    auto q4 = test.query<And<Position, NotInUse>>();
+    assert(q1.size() == 11 && q2.size() == 1 && q3.size() == 10 &&
+           q4.size() == 0);
   }
 }

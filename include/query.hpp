@@ -1,11 +1,14 @@
 #pragma once
 #include "component.hpp"
 #include <type_traits>
+#include <vector>
 
 template <typename... Components> class ISubQuery {
 public:
-  static int getMask(ComponentManager &cm) {
-    return (0 | ... | cm.getMask<Components>());
+  static std::vector<int> getIds(ComponentManager &cm) {
+    std::vector<int> ids;
+    (ids.emplace_back(cm.getId<Components>()), ...);
+    return ids;
   }
   virtual ~ISubQuery() = default;
 };
@@ -37,17 +40,21 @@ template <typename... SubQueries>
   requires(is_instance_of_v<SubQueries, ISubQuery>, ...)
 class Query {
 public:
-  int andMask = 0, notMask = 0;
+  std::vector<int> andIds, notIds;
 
   Query(ComponentManager &cm) { (processSubQuery<SubQueries>(cm), ...); }
 
 private:
   template <typename SubQuery>
+    requires(is_instance_of_v<SubQuery, ISubQuery>)
   inline void processSubQuery(ComponentManager &cm) {
+    std::vector<int> ids = SubQuery::getIds(cm);
     if constexpr (is_instance_of_v<SubQuery, And>) {
-      andMask |= SubQuery::getMask(cm);
+      andIds.reserve(andIds.size() + ids.size());
+      andIds.insert(andIds.end(), ids.begin(), ids.end());
     } else if constexpr (is_instance_of_v<SubQuery, Not>) {
-      notMask |= SubQuery::getMask(cm);
+      notIds.reserve(notIds.size() + ids.size());
+      notIds.insert(notIds.end(), ids.begin(), ids.end());
     }
   }
 };

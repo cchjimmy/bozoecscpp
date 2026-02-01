@@ -11,7 +11,9 @@ public:
   ~ComponentManager() = default;
 
   template <typename T> inline void reg() {
-    mMaskMap[typeid(T)] = 1 << mMaskMap.size();
+    if (mIdMap.contains(typeid(T)))
+      return;
+    mIdMap[typeid(T)] = mIdMap.size();
     mPoolMap[typeid(T)] = std::make_shared<ObjectPoolMap<entityT, T>>();
   }
 
@@ -31,16 +33,12 @@ public:
     return getOPM<T>()->get(entity);
   }
 
-  template <typename T> inline bool isRegistered() {
-    return mMaskMap.find(typeid(T)) != mMaskMap.end();
-  }
-
   template <typename T> inline size_t size() {
     return mPoolMap[typeid(T)]->size();
   }
 
-  template <typename T> inline int getMask() {
-    return mMaskMap.contains(typeid(T)) ? mMaskMap[typeid(T)] : -1;
+  template <typename T> inline int getId() {
+    return mIdMap.contains(typeid(T)) ? mIdMap[typeid(T)] : -1;
   }
 
   void copy(const entityT &src, const entityT &dest) {
@@ -66,7 +64,7 @@ public:
 
 private:
   std::unordered_map<std::type_index, std::shared_ptr<IObjectPoolMap>> mPoolMap;
-  std::unordered_map<std::type_index, uint32_t> mMaskMap;
+  std::unordered_map<std::type_index, int> mIdMap;
 
   template <typename T> std::shared_ptr<ObjectPoolMap<entityT, T>> getOPM() {
     return std::static_pointer_cast<ObjectPoolMap<entityT, T>>(
